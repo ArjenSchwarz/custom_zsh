@@ -30,6 +30,7 @@
 
 CURRENT_BG='NONE'
 SEGMENT_SEPARATOR=''
+RHS_START=''
 
 # Begin a segment
 # Takes two arguments, background and foreground. Both can be omitted,
@@ -56,6 +57,11 @@ prompt_end() {
   fi
   echo -n "%{%f%}"
   CURRENT_BG=''
+}
+
+# Start the prompt
+prompt_start() {
+  prompt_segment $CURRENT_BG blue "${RHS_START}"
 }
 
 # End the prompt, closing any open segments
@@ -127,6 +133,52 @@ prompt_dir() {
   prompt_segment blue black '%~'
 }
 
+prompt_go_version() {
+  local go_version
+  go_version=$(go version 2>/dev/null | sed -E "s/.*(go[0-9.]*).*/\1/")
+
+  if [[ -n "$go_version" ]]; then
+    prompt_segment green black "$go_version"
+  fi
+}
+
+prompt_load() {
+  # The load segment can have three different states
+  local current_state="unknown"
+  local cores
+
+  typeset -AH load_states
+  load_states=(
+    'critical'      'red'
+    'warning'       'yellow'
+    'normal'        'green'
+  )
+
+  if [[ "$OS" == "MACOS" ]] || [[ "$OS" == "BSD" ]]; then
+    load_avg_1min=$(sysctl vm.loadavg | grep -o -E '[0-9]+(\.|,)[0-9]+' | head -n 1)
+    if [[ "$OS" == "MACOS" ]]; then
+      cores=$(sysctl -n hw.logicalcpu)
+    else
+      cores=$(sysctl -n hw.ncpu)
+    fi
+  else
+    load_avg_1min=$(grep -o "[0-9.]*" /proc/loadavg | head -n 1)
+    cores=$(nproc)
+  fi
+
+  # Replace comma
+  load_avg_1min=${load_avg_1min//,/.}
+
+  if [[ "$load_avg_1min" -gt $(bc -l <<< "${cores} * 0.7") ]]; then
+    current_state="critical"
+  elif [[ "$load_avg_1min" -gt $(bc -l <<< "${cores} * 0.5") ]]; then
+    current_state="warning"
+  else
+    current_state="normal"
+  fi
+  prompt_segment ${load_states[$current_state]} black "☰ $load_avg_1min"
+}
+
 # Virtualenv: current working virtualenv
 prompt_virtualenv() {
   local virtualenv_path="$VIRTUAL_ENV"
@@ -178,15 +230,16 @@ build_prompt_left_upper() {
 
 ## Right hand upper part of prompt
 build_prompt_right_upper() {
+  prompt_start
   prompt_time
-  prompt_rubyversion
-  prompt_end
+  # prompt_rubyversion
 }
 
 ## Left hand, main prompt
 build_prompt_left_lower() {
   RETVAL=$?
   prompt_status
+  prompt_load
   prompt_git
   prompt_line_end
 }
