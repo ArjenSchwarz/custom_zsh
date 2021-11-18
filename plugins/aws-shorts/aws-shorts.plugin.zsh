@@ -20,6 +20,10 @@ function whichcfn() {
   aws cloudformation describe-stack-resources --physical-resource-id ${1}
 }
 
+function awsdecode() {
+  aws sts decode-authorization-message --encoded-message ${1} --output text | jq
+}
+
 compdef _rcfn cfnresources cfnoutputs cfnparams
 
 # Find the autocompletion list
@@ -152,6 +156,55 @@ function awslogin() {
   aws sso login --profile $1
 }
 
+function getssoarn() {
+  aws sso-admin list-instances --query 'Instances[0].InstanceArn' --output text
+}
+
+function getssoid() {
+  echo $(getssoarn) | cut -d'/' -f2
+}
+
+function allpermissionsets() {
+  aws sso-admin list-permission-sets --instance-arn $(getssoarn) --query 'PermissionSets' --output text
+}
+
+function storecachessops() {
+  ssoarn=$(getssoarn)
+  cache="{"
+  for permissionArn in $(allpermissionsets)
+  do
+    permissionName=$(aws sso-admin describe-permission-set --instance-arn ${ssoarn} --permission-set-arn ${permissionArn} --query 'PermissionSet.Name' --output text)
+    cache="${cache} \"${permissionName}\":\"${permissionArn}\","
+  done
+  mkdir -p $HOME/.aws/cache
+  echo "${cache%?}}" > $HOME/.aws/cache/$(getssoid)-ps.json
+}
+
+function loadfromcachessops() {
+  ssoid=$(getssoid)
+  if [[ -f "$HOME/.aws/cache/${ssoid}-ps.json" ]]; then
+    cat $HOME/.aws/cache/${ssoid}-ps.json | jq ".${1}" -r
+  fi
+}
+
+function getssopsbyname() {
+  searchValue=${1}
+  fromcache=$(loadfromcachessops ${searchValue})
+  if [[ ! -z ${fromcache} ]]; then
+    echo ${fromcache}
+  else
+    ssoarn=$(getssoarn)
+    for permissionSet in $(allpermissionsets)
+    do
+      apiresult=$(aws sso-admin describe-permission-set --instance-arn ${ssoarn} --permission-set-arn ${permissionSet} --query 'PermissionSet.Name' --output text)
+      if [[ "${searchValue}" == "${apiresult}" ]]; then
+        echo ${permissionSet}
+        break
+      fi
+    done
+  fi
+}
+
 ## Exports keys for the currently set SSO profile
 function awsexportcurrent() {
   sso_start_url=$(aws configure get sso_start_url --profile $AWS_PROFILE)
@@ -176,6 +229,8 @@ function awsexportcurrent() {
   export AWS_ACCESS_KEY_ID=$(jq -r '.roleCredentials.accessKeyId' <<< $creds)
   export AWS_SECRET_ACCESS_KEY=$(jq -r '.roleCredentials.secretAccessKey' <<< $creds)
   export AWS_SESSION_TOKEN=$(jq -r '.roleCredentials.sessionToken' <<< $creds)
+  # asp will clear the profile to prevent potential issues with 2 sets of credentials
+  asp
 }
 
 compdef _regions awsregion
@@ -201,14 +256,14 @@ function awsLoginDetails() {
   if [[ -a "$HOME/.aws/accounts/$AWS_IDENTIFIER" ]]; then
     # nothing
   else
-    if [[ -z $AWS_PROFILE ]]; then
+    # if [[ -z $AWS_PROFILE ]]; then
       user=$(aws sts get-caller-identity --query "Arn" --output text | cut -f 2 -d "/")
       if [[ $user == 'AWSReservedSSO'* ]]; then
         user=$(echo $user | cut -f 2 -d "_")
       fi
-    else
-      user=$(aws configure get profile.$AWS_PROFILE.sso_role_name)
-    fi
+    # else
+    #   user=$(aws configure get profile.$AWS_PROFILE.sso_role_name)
+    # fi
     account=$(aws iam list-account-aliases --query 'AccountAliases[0]' --output text)
     mkdir -p $HOME/.aws/accounts
     echo "${user}@${account}" > $HOME/.aws/accounts/$AWS_IDENTIFIER
@@ -218,4 +273,15 @@ function awsLoginDetails() {
   if [[ -n $AWS_REGION ]]; then
     account="${account}:${AWS_REGION}"
   fi
+}
+
+function updateawscli() {
+  curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+  sudo installer -pkg AWSCLIV2.pkg -target /
+  rm AWSCLIV2.pkg
+}
+
+function aad() {
+  saml2aws login -a $@
+  asp $@
 }
