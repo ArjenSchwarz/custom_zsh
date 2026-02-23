@@ -45,8 +45,16 @@ fcd() {
         cd ${DIRS[1]}
     else
         echo "Multiple results found:"
-        print -C 1 $DIRS
-        cd ${DIRS[1]}
+        for i in {1..${#DIRS}}; do
+            echo "  $i) ${DIRS[$i]##*/}"
+        done
+        echo ""
+        read "choice?Select a directory [1-${#DIRS}]: "
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#DIRS} )); then
+            cd ${DIRS[$choice]}
+        else
+            echo "Invalid selection"
+        fi
     fi
 }
 
