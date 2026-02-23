@@ -37,7 +37,11 @@
 # Do the search and go to the result
 fcd() {
     DIRS=("${(@f)$(find ${FCD_BASEDIR} -mindepth 1 -maxdepth 1 -type d -path "*$1*" ! -iname ".*")}")
-    if (( ${#DIRS} == 1 )); then
+    # Check for an exact directory name match and prioritise it
+    EXACT=("${(@f)$(find ${FCD_BASEDIR} -mindepth 1 -maxdepth 1 -type d -name "$1" ! -iname ".*")}")
+    if (( ${#EXACT} >= 1 )) && [[ -n "${EXACT[1]}" ]]; then
+        cd ${EXACT[1]}
+    elif (( ${#DIRS} == 1 )); then
         cd ${DIRS[1]}
     else
         echo "Multiple results found:"
