@@ -21,7 +21,11 @@ function whichcfn() {
 }
 
 function awsdecode() {
-  aws sts decode-authorization-message --encoded-message ${1} --output text | jq
+aws sts decode-authorization-message --encoded-message ${1} --output text | jq
+}
+
+function listvpcs() {
+  aws ec2 describe-vpcs --query 'Vpcs[*].{Name:Tags[?Key == `Name`] | [0].Value,ID:VpcId,CIDR:CidrBlock}' --output table
 }
 
 compdef _rcfn cfnresources cfnoutputs cfnparams

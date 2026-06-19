@@ -1,0 +1,134 @@
+# ~/.config/starship.toml
+
+# Right-side prompt (your SPACESHIP_RPROMPT_ORDER=(time))
+right_format = "$time"
+
+# Main prompt order (matches your SPACESHIP_PROMPT_ORDER)
+format = """
+$directory\
+$nodejs\
+$ruby\
+$golang\
+$aws\
+$python\
+$kubernetes\
+$cmd_duration\
+$line_break\
+${custom.load_critical}${custom.load_warning}${custom.load_normal}\
+$git_branch\
+$git_status\
+$battery\
+$jobs\
+$character"""
+
+[directory]
+style = "bold #c678dd"
+format = "[$path]($style)[$read_only]($read_only_style) "
+truncation_length = 3
+truncate_to_repo = true
+
+[time]
+disabled = false
+style = "cyan"
+format = "[$time]($style) "
+time_format = "%T"
+
+[kubernetes]
+disabled = false
+symbol = "☸️  "
+style = "cyan"
+format = '[$symbol$context( \($namespace\))]($style) '
+
+[nodejs]
+format = "[$symbol($version )]($style)"
+
+[ruby]
+format = "[$symbol($version )]($style)"
+
+[golang]
+format = "[$symbol($version )]($style)"
+
+[aws]
+format = '[$symbol($profile )(\($region\) )(\[$duration\] )]($style)'
+
+[python]
+format = '[${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
+pyenv_version_name = true
+
+[cmd_duration]
+min_time = 2000
+format = "took [$duration]($style) "
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+
+[git_status]
+format = '([\[$all_status$ahead_behind\]]($style) )'
+
+[battery]
+full_symbol = "🔋 "
+charging_symbol = "⚡ "
+discharging_symbol = "💀 "
+
+[[battery.display]]
+threshold = 30
+style = "bold red"
+
+[character]
+success_symbol = "[❯ ](bold green)"
+error_symbol = "[❯ ](bold red)"
+
+[status]
+disabled = false
+format = '[$symbol$status]($style) '
+
+[custom.load_critical]
+command = "uptime | awk -F'load averages?:[ ]*' '{print $2}' | awk '{print $1}'"
+when = """
+  if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "FreeBSD" ]; then
+    load=$(sysctl -n vm.loadavg | awk '{print $2}')
+    cores=$(sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu)
+  else
+    load=$(awk '{print $1}' /proc/loadavg)
+    cores=$(nproc)
+  fi
+  awk -v l="$load" -v c="$cores" 'BEGIN { exit !(l > c * 0.7) }'
+"""
+shell = ["sh", "--noprofile", "--norc"]
+format = "[☰ $output]($style) "
+style = "bg:red fg:black"
+description = "Load average — critical (>70% of cores)"
+
+[custom.load_warning]
+command = "uptime | awk -F'load averages?:[ ]*' '{print $2}' | awk '{print $1}'"
+when = """
+  if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "FreeBSD" ]; then
+    load=$(sysctl -n vm.loadavg | awk '{print $2}')
+    cores=$(sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu)
+  else
+    load=$(awk '{print $1}' /proc/loadavg)
+    cores=$(nproc)
+  fi
+  awk -v l="$load" -v c="$cores" 'BEGIN { exit !(l > c * 0.5 && l <= c * 0.7) }'
+"""
+shell = ["sh", "--noprofile", "--norc"]
+format = "[☰ $output]($style) "
+style = "bg:yellow fg:black"
+description = "Load average — warning (50–70% of cores)"
+
+[custom.load_normal]
+command = "uptime | awk -F'load averages?:[ ]*' '{print $2}' | awk '{print $1}'"
+when = """
+  if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "FreeBSD" ]; then
+    load=$(sysctl -n vm.loadavg | awk '{print $2}')
+    cores=$(sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu)
+  else
+    load=$(awk '{print $1}' /proc/loadavg)
+    cores=$(nproc)
+  fi
+  awk -v l="$load" -v c="$cores" 'BEGIN { exit !(l <= c * 0.5) }'
+"""
+shell = ["sh", "--noprofile", "--norc"]
+format = "[☰ $output]($style) "
+style = "bg:green fg:black"
+description = "Load average — normal (<50% of cores)"
